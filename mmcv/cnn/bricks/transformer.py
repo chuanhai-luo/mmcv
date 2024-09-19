@@ -508,25 +508,41 @@ class MultiheadAttention(BaseModule):
             if self.batch_first is False, else
             [bs, num_queries embed_dims].
         """
+        print("[MultiheadAttention][forward] start")
+
+        print("[MultiheadAttention][forward] shape of query: {}".format(query.shape))
+        print("[MultiheadAttention][forward] shape of key: {}".format(key.shape if key is not None else None))
+        print("[MultiheadAttention][forward] size of value: {}".format(len(value)))
+        # for ind,item in enumerate(value):
+        #     print("[MultiheadAttention][forward] shape of value[{}]: {}".format(ind, item.shape))
+
+        print("[MultiheadAttention][forward] shape of query_pos: {}".format(query_pos.shape if query_pos is not None else None))
+        print("[MultiheadAttention][forward] shape of key_pos: {}".format(key_pos.shape if key_pos is not None else None))
 
         if key is None:
             key = query
+            print("[MultiheadAttention][forward] key = query")
         if value is None:
             value = key
+            print("[MultiheadAttention][forward] value = key")
         if identity is None:
             identity = query
+            print("[MultiheadAttention][forward] identity = query")
         if key_pos is None:
             if query_pos is not None:
                 # use query_pos if key_pos is not available
                 if query_pos.shape == key.shape:
                     key_pos = query_pos
+                    print("[MultiheadAttention][forward] key_pos = query_pos")
                 else:
                     warnings.warn(f'position encoding of key is'
                                   f'missing in {self.__class__.__name__}.')
         if query_pos is not None:
             query = query + query_pos
+            print("[MultiheadAttention][forward] query = query + query_pos")
         if key_pos is not None:
             key = key + key_pos
+            print("[MultiheadAttention][forward] key = key + key_pos")
 
         # Because the dataflow('key', 'query', 'value') of
         # ``torch.nn.MultiheadAttention`` is (num_query, batch,
@@ -539,6 +555,8 @@ class MultiheadAttention(BaseModule):
             key = key.transpose(0, 1)
             value = value.transpose(0, 1)
 
+        print("[MultiheadAttention][forward] ready to {}".format(self.attn.__class__.__name__))
+
         out = self.attn(
             query=query,
             key=key,
@@ -548,6 +566,8 @@ class MultiheadAttention(BaseModule):
 
         if self.batch_first:
             out = out.transpose(0, 1)
+
+        print("[MultiheadAttention][forward] end")
 
         return identity + self.dropout_layer(self.proj_drop(out))
 
@@ -805,6 +825,11 @@ class BaseTransformerLayer(BaseModule):
         Returns:
             Tensor: forwarded results with shape [num_queries, bs, embed_dims].
         """
+        print("[BaseTransformerLayer][forward] start")
+        print("[BaseTransformerLayer][forward] shape of query {}".format(query.shape if query is not None else None))
+        print("[BaseTransformerLayer][forward] shape of key {}".format(key.shape if key is not None else None))
+        for idx,item in enumerate(value):
+            print("[BaseTransformerLayer][forward] shape of value[{}] {}".format(idx, item.shape))
 
         norm_index = 0
         attn_index = 0
@@ -827,6 +852,9 @@ class BaseTransformerLayer(BaseModule):
         for layer in self.operation_order:
             if layer == 'self_attn':
                 temp_key = temp_value = query
+
+                print("[BaseTransformerLayer][forward] key = value = query")
+                print("[BaseTransformerLayer][forward] ready to {}".format(self.attentions[attn_index].__class__.__name__))
                 query = self.attentions[attn_index](
                     query,
                     temp_key,
@@ -845,6 +873,7 @@ class BaseTransformerLayer(BaseModule):
                 norm_index += 1
 
             elif layer == 'cross_attn':
+                print("[BaseTransformerLayer][forward] ready to {}".format(self.attentions[attn_index].__class__.__name__))
                 query = self.attentions[attn_index](
                     query,
                     key,
@@ -862,6 +891,9 @@ class BaseTransformerLayer(BaseModule):
                 query = self.ffns[ffn_index](
                     query, identity if self.pre_norm else None)
                 ffn_index += 1
+
+        print("[BaseTransformerLayer][forward] shape of query {}".format(query.shape))
+        print("[BaseTransformerLayer][forward] end")
 
         return query
 
